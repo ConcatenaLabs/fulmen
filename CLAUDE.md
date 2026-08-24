@@ -8,8 +8,8 @@ Since 0.2.0 it also **bundles and manages a SeqLN node** rather than only attach
 one: a native bundle on Linux, and a WSL2 rootfs on Windows.
 
 Node and consensus conventions live in the
-[`Sequentia`](https://github.com/GracedEternalKingCabbageMan/Sequentia) repo; SeqLN itself lives in
-[`seqln`](https://github.com/GracedEternalKingCabbageMan/seqln).
+[`Sequentia`](https://github.com/ConcatenaLabs/Sequentia) repo; SeqLN itself lives in
+[`seqln`](https://github.com/ConcatenaLabs/seqln).
 
 ## Layout
 

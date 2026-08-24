@@ -26,14 +26,14 @@ What it surfaces is what makes SeqLN different from vanilla Lightning:
 Sequentia is a Bitcoin sidechain for asset tokenization and decentralized
 exchange, built as a fork of Blockstream Elements 23.3.3. Protocol documentation
 lives in the node repo:
-[Sequentia `doc/sequentia/`](https://github.com/GracedEternalKingCabbageMan/Sequentia/tree/HEAD/doc/sequentia).
+[Sequentia `doc/sequentia/`](https://github.com/ConcatenaLabs/Sequentia/tree/HEAD/doc/sequentia).
 
 | Repo | One-liner |
 |---|---|
-| [`Sequentia`](https://github.com/GracedEternalKingCabbageMan/Sequentia) | The Sequentia node (`sequentiad`, a fork of Elements 23.3.3): consensus, anchoring, proof of stake, open fee market, plus the canonical protocol documentation in `doc/sequentia/`. |
-| [`seqln`](https://github.com/GracedEternalKingCabbageMan/seqln) | SeqLN: a Core Lightning fork that runs on Sequentia and Bitcoin from the same binary: asset channels, any-asset payments, pure-Lightning swaps. |
-| [`fulmen`](https://github.com/GracedEternalKingCabbageMan/fulmen) | Fulmen: desktop (Electron) wallet for SeqLN with a bundled Lightning node. |
-| [`seqdex`](https://github.com/GracedEternalKingCabbageMan/seqdex) | SeqDEX: non-custodial atomic-swap DEX with an on-chain covenant order book (SeqOB) served over a relay, same-chain swaps, and cross-chain BTC↔asset swaps made safe by Bitcoin anchoring. |
+| [`Sequentia`](https://github.com/ConcatenaLabs/Sequentia) | The Sequentia node (`sequentiad`, a fork of Elements 23.3.3): consensus, anchoring, proof of stake, open fee market, plus the canonical protocol documentation in `doc/sequentia/`. |
+| [`seqln`](https://github.com/ConcatenaLabs/seqln) | SeqLN: a Core Lightning fork that runs on Sequentia and Bitcoin from the same binary: asset channels, any-asset payments, pure-Lightning swaps. |
+| [`fulmen`](https://github.com/ConcatenaLabs/fulmen) | Fulmen: desktop (Electron) wallet for SeqLN with a bundled Lightning node. |
+| [`seqdex`](https://github.com/ConcatenaLabs/seqdex) | SeqDEX: non-custodial atomic-swap DEX with an on-chain covenant order book (SeqOB) served over a relay, same-chain swaps, and cross-chain BTC↔asset swaps made safe by Bitcoin anchoring. |
 
 Live testnet services (explorer, web wallet, faucet, downloads) are at
 https://sequentiatestnet.com/.
@@ -73,7 +73,7 @@ through a node RPC, so you need:
 
 - **Required**: a Sequentia node (`sequentiad`) RPC endpoint, local or remote
   (default `127.0.0.1:18332`). Node downloads and setup:
-  [Sequentia](https://github.com/GracedEternalKingCabbageMan/Sequentia) or the
+  [Sequentia](https://github.com/ConcatenaLabs/Sequentia) or the
   prebuilt binaries on the download page.
 - **Optional**: a Bitcoin testnet4 node (`bitcoind`) RPC endpoint (default
   `127.0.0.1:48332`) if you also want Lightning on Bitcoin testnet4, which is the
@@ -205,7 +205,7 @@ up `build/seqln-linux-x64/` automatically.
 
 ### Stage the SeqLN runtime bundle (Linux x64)
 
-Requires a built [seqln](https://github.com/GracedEternalKingCabbageMan/seqln)
+Requires a built [seqln](https://github.com/ConcatenaLabs/seqln)
 tree, the Sequentia node's `sequentia-cli`, and a `bitcoin-cli`. The script
 stages `sequentia-cli` under the name `elements-cli`, which is what SeqLN's
 `bcli` plugin invokes. Paths are overridable via environment variables
