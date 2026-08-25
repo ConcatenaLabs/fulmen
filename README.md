@@ -16,7 +16,7 @@ What it surfaces is what makes SeqLN different from vanilla Lightning:
 - **Per-asset balances**: on-chain and in-channel funds, grouped by asset.
 - **Dual-chain**: Fulmen can run a second SeqLN node on Bitcoin testnet4 next to
   the Sequentia one. With both running you are set up for asset-to-BTC Lightning
-  swaps (the swap flow itself is not in the GUI yet; see Status).
+  swaps, though the swap flow itself has no Fulmen UI (see "What to expect").
 
 > **Testnet software.** Everything here runs on the Sequentia public testnet and
 > Bitcoin testnet4. There is no mainnet. Do not use it with anything of value.
@@ -38,7 +38,9 @@ lives in the node repo:
 Live testnet services (explorer, web wallet, faucet, downloads) are at
 https://sequentiatestnet.com/.
 
-## Status (v0.2.0)
+## What to expect
+
+Fulmen is a preview, and the honest picture is this:
 
 - Implemented and working: bundled-node management on Linux (spawn, supervise,
   clean shutdown), onboarding wizard, per-asset balances, channel list and
@@ -61,10 +63,14 @@ https://sequentiatestnet.com/.
 
 Downloads: https://sequentiatestnet.com/download/
 
+That page always names the current release; this file deliberately does not,
+because a version pinned in prose goes stale the next time a build is
+published.
+
 | Platform | Artifact |
 |---|---|
-| Linux x86_64 | `Fulmen-0.2.0-linux-x86_64.AppImage` (bundled SeqLN runtime included) |
-| Windows x64 | `Fulmen-Setup-0.2.0.exe` (one-click NSIS installer) or `Fulmen-0.2.0-win64.zip` (unpack and run `Fulmen.exe`) |
+| Linux x86_64 | `Fulmen-<version>-linux-x86_64.AppImage` (bundled SeqLN runtime included) |
+| Windows x64 | `Fulmen-Setup-<version>.exe` (one-click NSIS installer) or `Fulmen-<version>-win64.zip` (unpack and run `Fulmen.exe`) |
 
 ### What you need first
 
@@ -85,8 +91,8 @@ same-user node.
 ### Linux
 
 ```
-chmod +x Fulmen-0.2.0-linux-x86_64.AppImage
-./Fulmen-0.2.0-linux-x86_64.AppImage
+chmod +x Fulmen-*-linux-x86_64.AppImage
+./Fulmen-*-linux-x86_64.AppImage
 ```
 
 ### Windows (requires WSL2)
@@ -255,8 +261,8 @@ All artifacts are unsigned.
 
 ### Smoke tests
 
-No test suite yet; the transports and the node manager each have a headless
-smoke mode:
+There is no test suite; the transports and the node manager each have a
+headless smoke mode instead:
 
 ```
 # CLN JSON-RPC over a unix socket (getinfo + listfunds)
