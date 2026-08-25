@@ -23,8 +23,8 @@ What it surfaces is what makes SeqLN different from vanilla Lightning:
 
 ## Where this fits in the Sequentia ecosystem
 
-Sequentia is a Bitcoin sidechain for asset tokenization and decentralized
-exchange, built as a fork of Blockstream Elements 23.3.3. Protocol documentation
+Sequentia is a Bitcoin sidechain for asset tokenization and disintermediated
+exchanges, built as a fork of Blockstream Elements 23.3.3. Protocol documentation
 lives in the node repo:
 [Sequentia `doc/sequentia/`](https://github.com/ConcatenaLabs/Sequentia/tree/HEAD/doc/sequentia).
 
