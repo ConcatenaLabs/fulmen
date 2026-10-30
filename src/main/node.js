@@ -55,8 +55,14 @@ function chainCliName(network) {
 // options bcli understands (option names keep the bitcoin- prefix on every
 // network, including Sequentia). Empty user/password lines are omitted so a
 // local same-user node can fall back to cookie auth.
+//
+// The node is a wallet: it opens its connections itself and takes none, so it
+// does not listen (autolisten=false). Listening on the network's default port
+// would stop it from starting wherever another Lightning node already holds
+// that port, as an operator's gateways do on the same machine (every WSL2
+// distro shares one network), and would announce the machine's address.
 function renderConfig({ network, backend, cliPath, extra }) {
-  const lines = [`network=${network}`];
+  const lines = [`network=${network}`, 'autolisten=false'];
   const b = backend || {};
   if (b.host) lines.push(`bitcoin-rpcconnect=${b.host}`);
   if (b.port) lines.push(`bitcoin-rpcport=${b.port}`);

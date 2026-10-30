@@ -10,9 +10,10 @@ What it surfaces is what makes SeqLN different from vanilla Lightning:
 
 - **Asset channels**: every channel carries one issued asset, and the UI shows
   which one.
-- **Any-asset payments**: pay a BOLT11 invoice in a chosen asset (Fulmen sends
-  `pay asset=<id>`), routed over same-asset channels only. Invoices themselves
-  are asset-blind; the payer chooses the asset.
+- **Payments in an asset**: a SeqLN invoice names the asset it is paid in
+  (its `a` field). Fulmen pays an invoice in the asset it names, over channels
+  in that asset only, and asks you to choose the asset of an invoice that names
+  none. Receive asks which asset the invoice is paid in; no asset is assumed.
 - **Per-asset balances**: on-chain and in-channel funds, grouped by asset.
 - **Dual-chain**: Fulmen can run a second SeqLN node on Bitcoin testnet4 next to
   the Sequentia one. With both running you are set up for asset-to-BTC Lightning
@@ -43,10 +44,11 @@ https://sequentiatestnet.com/.
 Fulmen is a preview, and the honest picture is this:
 
 - Implemented and working: bundled-node management on Linux (spawn, supervise,
-  clean shutdown), onboarding wizard, per-asset balances, channel list and
-  channel open with an asset id, BOLT11 pay with asset selection, invoice
-  creation, node logs, wallet backup surface, external-node mode (unix socket or
-  clnrest), and the optional second node on Bitcoin testnet4.
+  clean shutdown), onboarding wizard, per-asset balances, a deposit address and
+  on-chain sends in an asset, channel list, open and close in an asset, BOLT11
+  pay (reviewed first, held payments followed until they settle), invoices that
+  name their asset, node logs, wallet backup surface, external-node mode (unix
+  socket or clnrest), and the optional second node on Bitcoin testnet4.
 - The Linux bundled-node path has been exercised end-to-end headless (the node
   manager has a scriptable smoke mode, see Contributing). The GUI has had only
   limited interactive testing; treat it as a preview.
@@ -140,6 +142,126 @@ The backup dialog is always available again via Settings, "Back up wallet".
 `<network>` is `sequentia-testnet` or `testnet4`. Note that `config.json` stores
 the backend RPC password and (on Windows) the clnrest rune in plain text, with
 file mode 0600 on Linux.
+
+## Connecting to an operator's gateways
+
+An Ark operator serves Lightning through gateway nodes: on Sequentia, an Arca
+operator runs one SeqLN gateway for each asset it serves; on Bitcoin, a Bark
+ark runs a Core Lightning gateway for BTC. With a channel to a gateway,
+Fulmen pays into the operator's tree and is paid out of it, in an asset on
+Sequentia and in BTC on Bitcoin testnet4. The steps below connect to the
+Sequentia testnet's operator at `sequentiatestnet.com`; another operator works
+the same way at its own address. The same steps with `lightning-cli`, for a
+machine without Fulmen, are in
+[`docs/operator-gateways-cli.md`](docs/operator-gateways-cli.md).
+
+### 1. Install
+
+- **Windows**: run `Fulmen-Setup-<version>.exe` from the download page (a
+  one-click install for your user, no administrator rights). Fulmen's node needs
+  WSL2: `wsl --install` in an administrator PowerShell, then reboot. On its first
+  start Fulmen imports its node as the WSL distro `fulmen-seqln` and runs it
+  there. This path has not been run on real Windows hardware yet.
+- **Linux**: `chmod +x Fulmen-*-linux-x86_64.AppImage` and run it.
+- **macOS**: Fulmen is not built for macOS. Run SeqLN and Core Lightning
+  yourself and drive them with `lightning-cli`, as
+  [`docs/operator-gateways-cli.md`](docs/operator-gateways-cli.md) describes
+  step by step; it reaches the same channels and payments, and serves on any
+  machine where Fulmen does not run.
+
+### 2. Point it at the chain nodes
+
+Fulmen's node reads each chain through a node's RPC. In onboarding, step 2,
+enter the Sequentia node's host, port, user and password and press "Test
+connection"; tick "Also run Lightning on Bitcoin testnet4" and fill in the
+Bitcoin node the same way for the BTC side.
+
+- **With an operator bundle on the same machine**
+  ([`arca` `doc/operator-bundle.md`](https://github.com/ConcatenaLabs/arca/blob/master/doc/operator-bundle.md)):
+  the Sequentia node is `127.0.0.1`, port `18884`, and the Bitcoin testnet4 node
+  `127.0.0.1`, port `48332`; the user is the bundle's name, and
+  `install.sh credentials` prints both logins. On Windows the bundle and Fulmen
+  each run in a WSL2 distro, and all WSL2 distros share one network, so
+  `127.0.0.1` from Fulmen's distro reaches the bundle's nodes.
+- **Without a bundle**: any Sequentia node whose RPC you may use (your own
+  `sequentiad`, default port `18332`), and for the BTC side a Bitcoin testnet4
+  node (`bitcoind`, default port `48332`).
+
+Fulmen's node opens its own connections and listens for none, so it runs
+beside the bundle's gateways on one machine without taking their ports.
+
+### 3. Find the gateways
+
+The operator publishes them in its `info`:
+
+```
+curl -s https://sequentiatestnet.com/arca/v1/info | python3 -c '
+import json, sys
+i = json.load(sys.stdin)
+for a in i["assets"]:
+    l = a.get("lightning") or {}
+    if l.get("state") == "up":
+        print("asset", a["asset"], "gateway", l["node"] + "@sequentiatestnet.com:19850")
+b = ((i.get("lightning") or {}).get("bitcoin") or {}).get("node") or {}
+if b.get("node"):
+    print("BTC gateway", b["node"] + "@sequentiatestnet.com:19746")'
+```
+
+Each asset served over Lightning has its gateway node (`assets[].lightning.node`,
+while its `state` is `up`), which takes peers at `sequentiatestnet.com:19850`.
+The Bitcoin ark's gateway (`lightning.bitcoin.node.node`) takes peers at
+`sequentiatestnet.com:19746`.
+
+### 4. Fund the node and open the channels
+
+1. **Overview, "Show a deposit address"**: send coins of the asset to it, from
+   another wallet. A channel's funding transaction pays its network fee in the
+   channel's asset, so send a little more than the channel will hold.
+2. **Channels, "Open a channel"**: the peer `<gateway id>@sequentiatestnet.com:19850`,
+   the amount in atoms of the asset, and the asset from the list (the assets the
+   node holds on-chain). The channel is open once its funding transaction is in a
+   block.
+3. For BTC, switch to the Bitcoin testnet4 node (the network switch at the top
+   left), fund it the same way, and open a channel to
+   `<gateway id>@sequentiatestnet.com:19746` for an amount in satoshis. It opens
+   after a few testnet4 blocks.
+
+Each side of a channel keeps a reserve of 1% of it that it cannot send. The
+gateway pays you once its side holds more than that, which it does once you
+have paid into the tree.
+
+### 5. Pay into an Ark
+
+Ask the receiving wallet for an invoice: in an Arca wallet,
+`arca lightning receive <asset id> <atoms>` (or Receive in the Arca client); in
+a Bitcoin ark wallet, `arca lightning receive btc <sats>`. In Fulmen, **Pay**:
+paste the invoice and press Review. Fulmen shows the amount, the asset and the
+payee, and how long the amount can stay locked if the payment cannot complete,
+then pays when you press Pay.
+
+An operator's invoice for a payment into its tree asks for a long lock: the
+operator holds the payment until the receiving wallet has taken its coin in the
+operator's next round, so the invoice's final lock is about 5,800 Sequentia
+blocks (four days) with the usual 36-hour exit delay. Fulmen raises its pay
+call's limit (`maxdelay`) as far as the invoice needs, with room for a few
+hops, and no further. While the operator holds the payment, Pay shows it in
+flight; it turns to paid when the wallet takes its coin, or comes back to your
+channel if it never does. A Bitcoin ark wallet takes a payment while it is
+being paid, so run its `arca lightning claim <invoice>` as you pay.
+
+### 6. Receive out of an Ark
+
+**Receive**: choose the asset, enter the amount in atoms and create the
+invoice. The invoice names its asset, and an Arca wallet pays an invoice only
+from its coins in the asset the invoice names: `arca lightning pay <invoice>`.
+On the Bitcoin testnet4 node an invoice is in BTC, with no asset; a Bitcoin ark
+wallet pays it with the same command.
+
+### 7. Close
+
+**Channels, Close** closes a channel together with the gateway; its coins come
+back to the node's on-chain wallet once the closing transaction is in a block.
+**Overview, Send** moves on-chain coins out, in one asset at a time.
 
 ## How Fulmen talks to the node
 
@@ -259,10 +381,15 @@ it also stamps the icon and version metadata). Trigger it manually
 (`workflow_dispatch`); it fetches the rootfs tar from the download host.
 All artifacts are unsigned.
 
+### Tests
+
+`npm test` runs the unit tests (`test/*.test.js`, Node's own test runner): what
+Pay and Receive send for a decoded invoice (the asset, `maxdelay`, the lock
+shown) and the node's generated config.
+
 ### Smoke tests
 
-There is no test suite; the transports and the node manager each have a
-headless smoke mode instead:
+The transports and the node manager each have a headless smoke mode:
 
 ```
 # CLN JSON-RPC over a unix socket (getinfo + listfunds)

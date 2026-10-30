@@ -16,10 +16,15 @@ const KNOWN_ASSETS = {
 };
 let CFG = null;      // config snapshot from main
 let STATUS = null;   // last node-status snapshot
+let NET = '';        // the connected node's network, as its getinfo names it
 
-const onBitcoinNet = () => CFG && /^(bitcoin|testnet|signet|regtest)/.test(CFG.activeNetwork || '');
-const assetLabel = (id) => !id ? (onBitcoinNet() ? 'BTC' : 'fee asset') : (KNOWN_ASSETS[id] || (id.slice(0, 8) + '…'));
-const fmtAtoms = (msat) => Number((BigInt(msat || 0) / 1000n)).toLocaleString('en-US');
+const { planPayment, planInvoice, isSequentiaNetwork } = window.FulmenPlan;
+// The connected node's own network decides; before it answers, the network
+// Fulmen manages.
+const nodeNetwork = () => NET || (CFG && CFG.activeNetwork) || '';
+const onBitcoinNet = () => !isSequentiaNetwork(nodeNetwork());
+const assetLabel = (id) => !id ? (onBitcoinNet() ? 'BTC' : 'no asset') : (KNOWN_ASSETS[id] || (id.slice(0, 8) + '…'));
+const fmtAtoms = (msat) => Number((BigInt(String(msat || 0).replace(/msat$/, '')) / 1000n)).toLocaleString('en-US');
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 
 async function reloadCfg() { CFG = await window.fulmen.getConfig(); return CFG; }
@@ -28,9 +33,10 @@ async function reloadCfg() { CFG = await window.fulmen.getConfig(); return CFG; 
 $$('.nav').forEach(b => b.addEventListener('click', () => {
   $$('.nav').forEach(x => x.classList.toggle('active', x === b));
   $$('.view').forEach(v => v.classList.toggle('active', v.dataset.view === b.dataset.view));
-  if (b.dataset.view === 'overview') loadOverview();
+  if (b.dataset.view === 'overview') { loadOverview(); loadOnchainAssets(); }
   if (b.dataset.view === 'channels') loadChannels();
-  if (b.dataset.view === 'pay') loadAssets();
+  if (b.dataset.view === 'pay' || b.dataset.view === 'receive') loadAssets();
+  if (b.dataset.view === 'channels') loadFundingAssets();
   if (b.dataset.view === 'settings') renderManagedNodes();
 }));
 $('#ov-refresh').addEventListener('click', () => loadOverview());
@@ -40,6 +46,7 @@ $('#ch-refresh').addEventListener('click', () => loadChannels());
 async function refreshConn() {
   try {
     const info = await rpc('getinfo');
+    NET = info.network || '';
     $('#conn-dot').className = 'dot on';
     $('#conn-label').textContent = (info.alias || info.id.slice(0, 10)) + ' · ' + info.network;
     return info;
@@ -140,16 +147,31 @@ async function loadChannels() {
       const st = el('td'); st.appendChild(el('span', 'pill ' + (c.state === 'CHANNELD_NORMAL' ? 'st-normal' : 'st-other'), (c.state || '').replace('CHANNELD_', ''))); tr.appendChild(st);
       tr.appendChild(el('td', 'num', fmtAtoms(c.to_us_msat)));
       tr.appendChild(el('td', 'num', fmtAtoms((BigInt(c.total_msat || 0) - BigInt(c.to_us_msat || 0)).toString())));
+      const act = el('td');
+      if (c.state === 'CHANNELD_NORMAL' || c.state === 'CHANNELD_AWAITING_LOCKIN') {
+        const b = el('button', 'ghost', 'Close');
+        b.title = 'Close this channel together with the peer; its coins come back on-chain';
+        b.onclick = async () => {
+          const m = $('#ch-close-msg');
+          b.disabled = true; m.className = 'msg'; m.textContent = 'Closing…';
+          try { await rpc('close', { id: c.channel_id || c.short_channel_id }); m.className = 'msg ok'; m.textContent = 'Closed: the coins come back on-chain once the closing transaction is in a block.'; }
+          catch (e) { m.className = 'msg bad'; m.textContent = String(e.message || e); }
+          loadChannels();
+        };
+        act.appendChild(b);
+      }
+      tr.appendChild(act);
       body.appendChild(tr);
     }
-    if (!rows.length) { const tr = el('tr'); const td = el('td', 'muted', 'No channels.'); td.colSpan = 6; tr.appendChild(td); body.appendChild(tr); }
+    if (!rows.length) { const tr = el('tr'); const td = el('td', 'muted', 'No channels.'); td.colSpan = 7; tr.appendChild(td); body.appendChild(tr); }
   } catch (e) { $('#ch-err').textContent = String(e.message || e); }
 }
 
 $('#ch-open').addEventListener('click', async () => {
   const msg = $('#ch-open-msg'); msg.className = 'msg'; msg.textContent = 'Opening…';
-  const peer = $('#ch-peer').value.trim(), amount = $('#ch-amount').value.trim(), asset = $('#ch-asset').value.trim();
+  const peer = $('#ch-peer').value.trim(), amount = $('#ch-amount').value.trim(), asset = $('#ch-asset').value;
   try {
+    if (!onBitcoinNet() && !asset) throw new Error('Choose the asset the channel holds.');
     if (peer.includes('@')) {
       const [id, addr] = peer.split('@'); const [host, port] = addr.split(':');
       await rpc('connect', { id, host, port: port ? Number(port) : undefined });
@@ -163,41 +185,140 @@ $('#ch-open').addEventListener('click', async () => {
   } catch (e) { msg.className = 'msg bad'; msg.textContent = String(e.message || e); }
 });
 
-// --- pay ---------------------------------------------------------------------
+// --- assets ------------------------------------------------------------------
+// One <option> per asset id, labelled; the first option ("Choose an asset")
+// stays, so nothing is picked for the user unless only one asset is there.
+function fillAssetSelect(sel, assets) {
+  const cur = sel.value;
+  while (sel.options.length > 1) sel.remove(1);
+  for (const a of [...assets].sort()) { const o = el('option'); o.value = a; o.textContent = assetLabel(a) + ' · ' + a.slice(0, 12) + '…'; sel.appendChild(o); }
+  sel.value = assets.has(cur) ? cur : (assets.size === 1 ? [...assets][0] : '');
+  // Bitcoin has no assets: BTC is all there is.
+  sel.hidden = onBitcoinNet();
+}
+
+// Pay and Receive offer the assets of the node's channels.
 async function loadAssets() {
   try {
+    await refreshConn();
     const chans = await rpc('listpeerchannels');
     const seen = new Set();
     for (const c of (chans.channels || [])) if (c.channel_asset) seen.add(c.channel_asset);
-    const sel = $('#pay-asset'); const cur = sel.value;
-    sel.innerHTML = '<option value="">Fee/policy asset</option>';
-    for (const a of [...seen].sort()) { const o = el('option'); o.value = a; o.textContent = assetLabel(a) + ' · ' + a.slice(0, 12) + '…'; sel.appendChild(o); }
-    sel.value = cur;
+    fillAssetSelect($('#pay-asset'), seen);
+    fillAssetSelect($('#rc-asset'), seen);
+    $('#pay-hint').hidden = onBitcoinNet();
+    $('#rc-hint').hidden = onBitcoinNet();
   } catch {}
 }
-$('#pay-go').addEventListener('click', async () => {
-  const msg = $('#pay-msg'); msg.className = 'msg'; msg.textContent = 'Paying…';
-  const inv = $('#pay-inv').value.trim(), asset = $('#pay-asset').value;
+
+// A channel is funded from the node's on-chain coins, so it offers their assets.
+async function loadFundingAssets() {
   try {
-    const params = { bolt11: inv };
-    if (asset) params.asset = asset;
-    const r = await rpc('pay', params);
-    msg.className = 'msg ok';
-    msg.textContent = `Paid: ${r.status}, ${fmtAtoms(r.amount_msat)} sent in ${r.parts || 1} part(s).`;
+    await refreshConn();
+    const funds = await rpc('listfunds');
+    const seen = new Set();
+    for (const o of (funds.outputs || [])) if (o.asset && o.status === 'confirmed' && !o.reserved) seen.add(o.asset);
+    fillAssetSelect($('#ch-asset'), seen);
+  } catch {}
+}
+
+// --- on-chain ------------------------------------------------------------------
+async function loadOnchainAssets() {
+  try {
+    const funds = await rpc('listfunds');
+    const seen = new Set();
+    for (const o of (funds.outputs || [])) if (o.asset && o.status === 'confirmed' && !o.reserved) seen.add(o.asset);
+    fillAssetSelect($('#oc-asset'), seen);
+  } catch {}
+}
+$('#oc-addr-go').addEventListener('click', async () => {
+  try { const r = await rpc('newaddr', { addresstype: 'bech32' }); $('#oc-addr').textContent = r.bech32 || r.p2tr || ''; }
+  catch (e) { $('#oc-msg').className = 'msg bad'; $('#oc-msg').textContent = String(e.message || e); }
+});
+$('#oc-send').addEventListener('click', async () => {
+  const msg = $('#oc-msg'); msg.className = 'msg'; msg.textContent = 'Sending…';
+  try {
+    const dest = $('#oc-dest').value.trim(), amount = $('#oc-amount').value.trim(), asset = $('#oc-asset').value;
+    if (!dest) throw new Error('Name the address to send to.');
+    if (amount && !/^[0-9]+$/.test(amount)) throw new Error('The amount is a whole number of atoms.');
+    if (!onBitcoinNet() && !asset) throw new Error('Choose the asset to send.');
+    const params = { destination: dest, satoshi: amount ? Number(amount) : 'all' };
+    if (asset && !onBitcoinNet()) params.asset = asset;
+    const r = await rpc('withdraw', params);
+    msg.className = 'msg ok'; msg.textContent = 'Sent: ' + (r.txid || '');
+    loadOverview(); loadOnchainAssets();
   } catch (e) { msg.className = 'msg bad'; msg.textContent = String(e.message || e); }
+});
+
+// --- pay ---------------------------------------------------------------------
+// Review first: the node decodes the invoice, and Fulmen shows what will be
+// paid, in which asset, and how long the amount can stay locked if the
+// payment cannot complete. Pay sends exactly the reviewed call.
+let PENDING_PAY = null;
+const payMsg = (cls, text) => { const m = $('#pay-msg'); m.className = 'msg' + (cls ? ' ' + cls : ''); m.textContent = text; };
+
+$('#pay-go').addEventListener('click', async () => {
+  $('#pay-review').hidden = true; PENDING_PAY = null; payMsg('', 'Reading the invoice…');
+  const inv = $('#pay-inv').value.trim();
+  try {
+    if (!inv) throw new Error('Paste an invoice first.');
+    await refreshConn();
+    const d = await rpc('decode', { string: inv });
+    const plan = planPayment(Object.assign({ bolt11: inv }, d), nodeNetwork(), onBitcoinNet() ? '' : $('#pay-asset').value);
+    if (!plan.ok) { payMsg('bad', plan.reason); return; }
+    if (plan.asset) { $('#pay-asset').value = plan.asset; }
+    const what = plan.asset ? assetLabel(plan.asset) : (onBitcoinNet() ? 'sats' : '');
+    $('#pay-summary').textContent = `${fmtAtoms(plan.amountMsat)} ${what} to ${plan.payee ? plan.payee.slice(0, 16) + '…' : 'the payee'}${d.description ? ': ' + d.description : ''}`;
+    $('#pay-lock').textContent = plan.lockText;
+    $('#pay-review').hidden = false;
+    PENDING_PAY = plan;
+    payMsg('', '');
+  } catch (e) { payMsg('bad', String(e.message || e)); }
+});
+$('#pay-cancel').addEventListener('click', () => { $('#pay-review').hidden = true; PENDING_PAY = null; payMsg('', ''); });
+
+// A payment the payee holds (a hold invoice, such as an Ark operator's) can
+// outlast the call: then Fulmen follows it until it completes or comes back.
+async function followPayment(bolt11, lockText) {
+  for (;;) {
+    let p = null;
+    try { const r = await rpc('listpays', { bolt11 }); p = (r.pays || [])[0] || null; } catch {}
+    const st = p ? p.status : 'pending';
+    if (st === 'complete') { payMsg('ok', `Paid: ${fmtAtoms(p.amount_sent_msat || p.amount_msat)} sent. Proof of payment: ${(p.preimage || '').slice(0, 16)}…`); return; }
+    if (st === 'failed') { payMsg('bad', 'The payment failed; its amount is back in your channel.'); return; }
+    payMsg('', `In flight: the payee holds the payment until it takes it. It completes, or comes back to you, by itself. ${lockText}`);
+    await new Promise((r) => setTimeout(r, 10000));
+  }
+}
+
+$('#pay-confirm').addEventListener('click', async () => {
+  const plan = PENDING_PAY; if (!plan) return;
+  $('#pay-review').hidden = true; PENDING_PAY = null;
+  payMsg('', 'Paying…');
+  try {
+    const r = await rpc('pay', plan.params);
+    payMsg('ok', `Paid: ${r.status}, ${fmtAtoms(r.amount_sent_msat || r.amount_msat)} sent in ${r.parts || 1} part(s).`);
+  } catch (e) {
+    const m = String(e.message || e);
+    if (/timeout|timed out/i.test(m)) return followPayment(plan.params.bolt11, plan.lockText);
+    payMsg('bad', m);
+  }
 });
 
 // --- receive -----------------------------------------------------------------
 $('#rc-go').addEventListener('click', async () => {
   const msg = $('#rc-msg'); msg.className = 'msg'; msg.textContent = '';
-  const amount = $('#rc-amount').value.trim(), desc = $('#rc-desc').value.trim() || 'Fulmen invoice';
+  const desc = $('#rc-desc').value.trim() || 'Fulmen invoice';
   try {
-    const label = 'fulmen-' + Date.now();
-    const r = await rpc('invoice', { amount_msat: amount ? Number(amount) : 'any', label, description: desc });
+    await refreshConn();
+    const plan = planInvoice(nodeNetwork(), $('#rc-asset').value, $('#rc-amount').value, 'fulmen-' + Date.now(), desc);
+    if (!plan.ok) { msg.className = 'msg bad'; msg.textContent = plan.reason; return; }
+    const r = await rpc('invoice', plan.params);
     const out = $('#rc-out'); out.innerHTML = '';
     const box = el('div', 'b11', r.bolt11); out.appendChild(box);
     const btn = el('button', 'ghost copy', 'Copy'); btn.onclick = () => navigator.clipboard.writeText(r.bolt11);
     out.appendChild(btn);
+    if (plan.params.asset) { msg.className = 'msg'; msg.textContent = `Paid in ${assetLabel(plan.params.asset)}.`; }
   } catch (e) { msg.className = 'msg bad'; msg.textContent = String(e.message || e); }
 });
 
@@ -497,7 +618,7 @@ function wireOnboarding() {
     obShow(1);
     return;
   }
-  try { await refreshConn(); loadOverview(); }
+  try { await refreshConn(); loadOverview(); loadOnchainAssets(); }
   catch {
     $('#ov-err').textContent = CFG.bundled
       ? 'Not connected yet. Open Settings to start your bundled SeqLN node.'
