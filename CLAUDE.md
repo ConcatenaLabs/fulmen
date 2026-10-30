@@ -4,8 +4,8 @@ An Electron desktop wallet for SeqLN, the Sequentia Lightning Network. It talks 
 (a Core Lightning fork) and surfaces what makes SeqLN different from vanilla Lightning: asset
 channels, per-asset balances, and paying a BOLT11 in a chosen asset.
 
-Since 0.2.0 it also **bundles and manages a SeqLN node** rather than only attaching to an existing
-one: a native bundle on Linux, and a WSL2 rootfs on Windows.
+It also **bundles and manages a SeqLN node** rather than only attaching to an existing one: a
+native bundle on Linux, and a WSL2 rootfs on Windows.
 
 Node and consensus conventions live in the
 [`Sequentia`](https://github.com/ConcatenaLabs/Sequentia) repo; SeqLN itself lives in
@@ -19,8 +19,12 @@ Node and consensus conventions live in the
 - `src/main/node.js` — the bundled-node manager.
 - `src/main/preload.js` — the only surface the renderer sees (`window.fulmen`: `rpc` plus the config
   and node-management calls listed there). Keep it that way.
-- `src/renderer/` — the UI.
+- `src/renderer/` — the UI. `payplan.js` works out what Pay and Receive send (the asset, the pay
+  call's `maxdelay`, the lock shown before paying); it loads in the renderer and under Node.
+- `test/` — unit tests (`npm test`, Node's own test runner, no dependencies).
 - `build/` — icon generation and the two bundling scripts.
+- `docs/operator-gateways-cli.md` — the `lightning-cli` path to an Ark operator's gateways, for
+  machines without Fulmen; README's "Connecting to an operator's gateways" is the Fulmen path.
 - `docs/bundled-seqln-plan.md` — the work plan 0.2.0's bundling shipped from. Its status
   header records the deltas from the plan and, importantly, what was *not* verified: GUI
   click-through, and the whole Windows/WSL2 path on real Windows hardware (§6.8, still owed).
@@ -32,6 +36,7 @@ All of these are real `package.json` scripts:
 ```sh
 npm install
 npm start                 # electron .
+npm test                  # unit tests (test/*.test.js)
 npm run rpc-smoke         # node src/main/cln.js
 npm run node-smoke        # node src/main/node.js
 npm run bundle:seqln      # bash build/make-seqln-bundle.sh   (Linux SeqLN bundle)
@@ -42,8 +47,8 @@ npm run dist:win          # Windows zip
 npm run dist              # both
 ```
 
-There is no test suite. The `*-smoke` entries are scriptable headless probes rather than tests, and
-each needs arguments (a socket path; a host, port and rune; or the full NodeManager argument list) —
+`npm test` covers the payment and invoice planning and the node's generated config. The `*-smoke`
+entries are scriptable headless probes, and each needs arguments (a socket path; a host, port and rune; or the full NodeManager argument list) —
 `README.md`'s Contributing section has the exact invocations. The Linux bundled-node path has been
 exercised end to end through them; the GUI has had only limited interactive testing.
 

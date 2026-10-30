@@ -8,6 +8,7 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
+    "test": "node --test test/*.test.js",
     "rpc-smoke": "node src/main/cln.js",
     "node-smoke": "node src/main/node.js",
     "bundle:seqln": "bash build/make-seqln-bundle.sh",

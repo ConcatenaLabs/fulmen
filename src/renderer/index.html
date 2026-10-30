@@ -38,6 +38,21 @@
       <h2 class="sub">Balances by asset</h2>
       <div id="ov-balances" class="bal-grid"></div>
       <div id="ov-err" class="err"></div>
+      <h2 class="sub">On-chain</h2>
+      <div class="panel">
+        <div class="form-row">
+          <button id="oc-addr-go" class="ghost">Show a deposit address</button>
+          <span id="oc-addr" class="mono"></span>
+        </div>
+        <div class="form-row">
+          <input id="oc-dest" placeholder="send to address">
+          <input id="oc-amount" placeholder="amount in atoms (blank: all)" inputmode="numeric">
+          <select id="oc-asset"><option value="">Choose an asset</option></select>
+          <button id="oc-send" class="primary">Send</button>
+        </div>
+        <div class="hint">Coins sent to the deposit address fund channels. Send takes coins of the node's on-chain wallet out, in one asset; the network fee is paid in that asset.</div>
+        <div id="oc-msg" class="msg"></div>
+      </div>
     </section>
 
     <!-- CHANNELS -->
@@ -48,17 +63,18 @@
         <div class="form-row">
           <input id="ch-peer" placeholder="peer id (or id@host:port to connect first)">
           <input id="ch-amount" placeholder="amount (asset atoms)" inputmode="numeric">
-          <input id="ch-asset" placeholder="asset id (blank = fee/policy asset)">
+          <select id="ch-asset"><option value="">Choose an asset</option></select>
           <button id="ch-open" class="primary">Open</button>
         </div>
         <div id="ch-open-msg" class="msg"></div>
       </div>
       <div class="table-wrap">
         <table id="ch-table">
-          <thead><tr><th>Peer</th><th>Short id</th><th>Asset</th><th>State</th><th class="num">Ours</th><th class="num">Theirs</th></tr></thead>
+          <thead><tr><th>Peer</th><th>Short id</th><th>Asset</th><th>State</th><th class="num">Ours</th><th class="num">Theirs</th><th></th></tr></thead>
           <tbody id="ch-body"></tbody>
         </table>
       </div>
+      <div id="ch-close-msg" class="msg"></div>
       <div id="ch-err" class="err"></div>
     </section>
 
@@ -69,10 +85,18 @@
         <label class="lbl">BOLT11 invoice</label>
         <textarea id="pay-inv" rows="3" placeholder="lntsqt… / lntb…"></textarea>
         <div class="form-row">
-          <select id="pay-asset"><option value="">Fee/policy asset</option></select>
-          <button id="pay-go" class="primary">Pay</button>
+          <select id="pay-asset"><option value="">Choose an asset</option></select>
+          <button id="pay-go" class="primary">Review</button>
         </div>
-        <div class="hint">Choose the asset to route in. Fulmen sends <code>pay asset=&lt;id&gt;</code> so the payment travels over same-asset channels only.</div>
+        <div class="hint" id="pay-hint">An invoice that names an asset is paid in it. For one that names none, choose the asset: the payment travels over channels in that asset only.</div>
+        <div id="pay-review" class="review" hidden>
+          <div id="pay-summary"></div>
+          <div id="pay-lock" class="lock"></div>
+          <div class="form-row">
+            <button id="pay-confirm" class="primary">Pay</button>
+            <button id="pay-cancel" class="ghost">Cancel</button>
+          </div>
+        </div>
         <div id="pay-msg" class="msg"></div>
       </div>
     </section>
@@ -82,11 +106,12 @@
       <header class="vhead"><h1>Receive</h1></header>
       <div class="panel">
         <div class="form-row">
-          <input id="rc-amount" placeholder="amount (atoms/msat*1000)" inputmode="numeric">
+          <select id="rc-asset"><option value="">Choose an asset</option></select>
+          <input id="rc-amount" placeholder="amount in atoms (blank: any)" inputmode="numeric">
           <input id="rc-desc" placeholder="description">
           <button id="rc-go" class="primary">Create invoice</button>
         </div>
-        <div class="hint">An invoice is asset-blind; the payer chooses which asset to pay it in.</div>
+        <div class="hint" id="rc-hint">The invoice names the asset it is paid in, and a payer pays it in that asset. The list shows the assets of your channels.</div>
         <div id="rc-out" class="invoice-out"></div>
         <div id="rc-msg" class="msg"></div>
       </div>
@@ -219,6 +244,7 @@
     </div>
   </div>
 
+  <script src="payplan.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

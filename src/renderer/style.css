@@ -122,6 +122,9 @@ td.num, th.num { text-align: right; font-family: var(--mono); }
 .kvline .k { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .8px; flex: 0 0 110px; }
 .kvline .v { word-break: break-all; }
 
+/* The hidden attribute hides, whatever display a class gives the element. */
+[hidden] { display: none !important; }
+
 /* onboarding */
 .onboard { position: fixed; inset: 0; background: var(--bg); z-index: 50; display: flex; align-items: center; justify-content: center; }
 .ob-box { width: min(620px, 94vw); max-height: 92vh; overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 34px 38px; }
@@ -138,3 +141,7 @@ td.num, th.num { text-align: right; font-family: var(--mono); }
 .ob-nav > :only-child { margin-left: auto; }
 .ob-progress { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
 .ob-step .form-row { margin-top: 10px; }
+
+.review { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--gold); border-radius: 8px; background: var(--panel2); }
+.review #pay-summary { font-size: 14px; }
+.review .lock { color: var(--dim); font-size: 13px; margin: 8px 0 4px; }
