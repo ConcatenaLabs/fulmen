@@ -78,7 +78,7 @@ ark's gateway; it takes peers at `sequentiatestnet.com:19746`.
 On Sequentia, one channel for each asset, funded with coins of that asset:
 
 ```
-seq newaddr                          # send coins of the asset here, a little more than the channel
+seq newaddr bech32                   # send coins of the asset here, a little more than the channel
 seq listfunds                        # wait until they show "confirmed"
 seq connect <gateway id>@sequentiatestnet.com:19850
 seq fundchannel id=<gateway id> amount=<atoms> asset=<asset id>
