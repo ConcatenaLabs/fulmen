@@ -85,7 +85,10 @@ through a node RPC, so you need:
   prebuilt binaries on the download page.
 - **Optional**: a Bitcoin testnet4 node (`bitcoind`) RPC endpoint (default
   `127.0.0.1:48332`) if you also want Lightning on Bitcoin testnet4, which is the
-  setup asset-to-BTC swaps need.
+  setup asset-to-BTC swaps need. The node needs no fee estimates from it:
+  testnet4's often have none, so Fulmen's testnet4 node prices its own
+  transactions at fixed rates (30 sat/vB, and 2 sat/vB for a channel's
+  commitment).
 
 Leave the RPC username blank to use cookie authentication against a local
 same-user node.

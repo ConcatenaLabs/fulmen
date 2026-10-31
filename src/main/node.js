@@ -61,8 +61,23 @@ function chainCliName(network) {
 // would stop it from starting wherever another Lightning node already holds
 // that port, as an operator's gateways do on the same machine (every WSL2
 // distro shares one network), and would announce the machine's address.
+//
+// On a Bitcoin test network the node prices its own transactions at fixed
+// rates (force-feerates, which lightningd takes on test networks only): a
+// testnet4 node often has no fee estimate at all, for hours, and the node then
+// refuses every channel open ("Cannot estimate fees (yet)"). The rates, in
+// satoshis per 1,000 weight (250 to the sat/vB), in the order opening, mutual
+// close, unilateral close, delayed to us, HTLC resolution, penalty: 30 sat/vB,
+// what testnet4's mempool queues at, and 2 sat/vB for the commitment, which an
+// anchor lifts when needed. A line of the same option in `extra` replaces it.
+const TEST_NETWORK_FEERATES = 'force-feerates=7500/7500/500/7500/7500/7500';
+const BITCOIN_TEST_NETWORKS = new Set(['testnet', 'testnet4', 'signet', 'regtest']);
 function renderConfig({ network, backend, cliPath, extra }) {
   const lines = [`network=${network}`, 'autolisten=false'];
+  const own = extra || [];
+  if (BITCOIN_TEST_NETWORKS.has(network) && !own.some(l => /^\s*force-feerates\s*=/.test(l))) {
+    lines.push(TEST_NETWORK_FEERATES);
+  }
   const b = backend || {};
   if (b.host) lines.push(`bitcoin-rpcconnect=${b.host}`);
   if (b.port) lines.push(`bitcoin-rpcport=${b.port}`);
