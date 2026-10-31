@@ -1,7 +1,7 @@
 {
   "name": "fulmen",
   "productName": "Fulmen",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Fulmen — a lightning-fast desktop wallet for SeqLN, the Sequentia Lightning Network. Ships with a bundled SeqLN node: point it at a Sequentia node and go. Asset channels, any-asset payments, and the dual-chain setup for pure-LN asset↔BTC swaps.",
   "author": "Concatena Labs",
   "license": "MIT",
