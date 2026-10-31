@@ -78,3 +78,13 @@ test("the node's config takes no inbound connections", () => {
   const c = renderConfig({ network: 'sequentia-testnet', backend: { host: '127.0.0.1', port: 18884, user: 'u', pass: 'p' }, cliPath: '/x/elements-cli' });
   assert.match(c, /^network=sequentia-testnet\nautolisten=false\n/);
 });
+
+test('a Bitcoin test network node prices its own transactions at fixed rates', () => {
+  const t4 = renderConfig({ network: 'testnet4', backend: { host: '127.0.0.1', port: 48332 }, cliPath: '/x/bitcoin-cli' });
+  assert.match(t4, /^force-feerates=7500\/7500\/500\/7500\/7500\/7500$/m);
+  const own = renderConfig({ network: 'testnet4', extra: ['force-feerates=1000'] });
+  assert.strictEqual((own.match(/^force-feerates=/gm) || []).length, 1);
+  assert.match(own, /^force-feerates=1000$/m);
+  const seq = renderConfig({ network: 'sequentia-testnet', backend: { host: '127.0.0.1', port: 18884 } });
+  assert.doesNotMatch(seq, /force-feerates/);
+});
